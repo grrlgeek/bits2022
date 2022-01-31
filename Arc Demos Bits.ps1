@@ -1,6 +1,3 @@
-Clear-Host
-cd "$($Home)\desktop\code\demo"
-
 # Let's check out our environment
 # We run a few VMs on Hyper-V
 Get-VM
