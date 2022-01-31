@@ -12,8 +12,6 @@ kubectl get nodes
 # Let's stay with our "big" cluster for now
 kubectl config use-context kubeadm-big
 kubectl get nodes
-kubectl get nodes -o json
-
 
 # A bit time factor is image download - so we've pre-pulled them
 kubectl get nodes (kubectl get nodes -o jsonpath="{.items[1].metadata.name}" ) -o jsonpath="{range .status.images[*]}{.names[1]}{'\n'}{end}" | grep arcdata 
