@@ -181,13 +181,13 @@ sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT @@version"
 
 # Backup / Restore
 # We have a fancy Database with PIT data
-sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT * FROM BackupDemo.dbo.Timestamps order by ts desc"
+sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT TOP 5 * FROM BackupDemo.dbo.Timestamps order by ts desc"
 
 $PointInTime=(get-date).AddMinutes(-90).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.ffZ")
 
 az sql midb-arc restore --managed-instance mi-1 --name BackupDemo --dest-name RestoreDemo --k8s-namespace arc --time $PointInTime --use-k8s
-sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT * FROM BackupDemo.dbo.Timestamps order by ts desc"
-sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT * FROM RestoreDemo.dbo.Timestamps order by ts desc"
+sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT TOP 5 * FROM BackupDemo.dbo.Timestamps order by ts desc"
+sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT TOP 5 * FROM RestoreDemo.dbo.Timestamps order by ts desc"
 
 kubectl get SqlManagedInstanceRestoreTask -n $k8sNamespace
 
