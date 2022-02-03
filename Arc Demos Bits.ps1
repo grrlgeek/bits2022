@@ -13,7 +13,7 @@ kubectl get nodes
 kubectl config use-context kubeadm-big
 kubectl get nodes
 
-# A bit time factor is image download - so we've pre-pulled them
+# A big time factor is image download - so we've pre-pulled them
 kubectl get nodes (kubectl get nodes -o jsonpath="{.items[1].metadata.name}" ) -o jsonpath="{range .status.images[*]}{.names[1]}{'\n'}{end}" | grep arcdata 
 
 # It's almost 40 GB (for current and previous version) - PER WORKER!
