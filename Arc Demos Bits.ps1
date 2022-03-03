@@ -18,7 +18,7 @@ kubectl get nodes (kubectl get nodes -o jsonpath="{.items[1].metadata.name}" ) -
 
 # It's almost 40 GB (for current and previous version) - PER WORKER!
 $TotalSize = 0
-((kubectl get nodes  (kubectl get nodes -o jsonpath="{.items[1].metadata.name}" )  -o jsonpath="{range .status.images[*]}{.sizeBytes}{'\t'}{.names[1]}{'\n'}{end}" | grep arcdata).Split("`t") | grep -v mcr).Split("`n") | Foreach { $TotalSize += $_}
+((kubectl get nodes  (kubectl get nodes -o jsonpath="{.items[1].metadata.name}" )  -o jsonpath="{range .status.images[*]}{.sizeBytes}{'\t'}{.names[1]}{'\n'}{end}" | grep arcdata).Split("`t") | grep -v mcr).Split("`n") | ForEach-Object { $TotalSize += $_}
 [Math]::Round(($TotalSize/1024/1024),2)
 
 
@@ -44,11 +44,11 @@ $ENV:SQLCMDPASSWORD=$ENV:AZDATA_PASSWORD
 # Create an RG
 az group create -l $Region -n $RG
 
-# We could deploy direct from Portal (requires arc connected k8s!)
+# We could deploy direct from Portal (requires arc connected k8s!) - Jes
 Start-Process https://portal.azure.com/#create/Microsoft.DataController
 
 # Let's stick to indirect for today
-# Deploy DC from Command Line
+# Deploy DC from Command Line - Ben
 az arcdata dc create --connectivity-mode Indirect --name arc-dc-kubeadm --k8s-namespace $k8sNamespace `
     --subscription $Subscription `
     -g $RG -l eastus --storage-class local-storage `
@@ -72,13 +72,12 @@ kubectl --namespace $k8sNamespace logs $ControlPod controller
 
 # Add Controller in ADS
 
-# Create MIs
+# Create MIs - Jes
 $gpinstance = "mi-gp"
 $bcinstance = "mi-bc"
 
 # General Purpose 
 az sql mi-arc create -n $gpinstance --k8s-namespace $k8sNamespace  --use-k8s `
---storage-class-backups local-storage `
 --storage-class-data local-storage `
 --storage-class-datalogs local-storage `
 --storage-class-logs local-storage `
@@ -102,8 +101,8 @@ az sql mi-arc list --k8s-namespace $k8sNamespace  --use-k8s -o table
 az sql mi-arc update --name $gpinstance --cores-limit 8 --cores-request 4 `
                 --memory-limit 16Gi --memory-request 8Gi --k8s-namespace $k8sNamespace --use-k8s
 
-# Let's restore AdventureWorks to our GP Instance
-copy e:\Backup\AdventureWorks2019.bak .
+# Let's restore AdventureWorks to our GP Instance - Ben
+copy-item e:\Backup\AdventureWorks2019.bak .
 kubectl cp AdventureWorks2019.bak mi-gp-0:/var/opt/mssql/data/AdventureWorks2019.bak -n $k8sNamespace -c arc-sqlmi
 Remove-Item AdventureWorks2019.bak
 
@@ -126,7 +125,7 @@ sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME  -Q "SELECT Name FROM sys.Databas
 # We can add, managed, monitor and query those from ADS!
 
 
-# MI HA 
+# MI HA - Jes
 
 # General purpose - HA is provided by k8s 
 # Verify HA 
@@ -145,7 +144,7 @@ az sql mi-arc show --name $bcinstance --k8s-namespace $k8sNamespace --use-k8s
 
 # Determine which is primary 
 for ($i=0; $i -le 2; $i++){
-kubectl get pod ("$($bcinstance)-$i") -n $k8sNamespace -o jsonpath="{.metadata.labels}" | ConvertFrom-Json | grep -v controller | grep -v app | grep -v arc-resource | grep -v -e '^$'
+kubectl get pod ("$($bcinstance)-$i") -n $k8sNamespace -o jsonpath="{.metadata.labels}" | ConvertFrom-Json | grep -v controller | grep -v app | grep -v arc-resource | grep -v AzureArcData | grep -v -e '^$'
 }
 
 # Delete a Pod
@@ -157,7 +156,7 @@ for ($i=0; $i -le 2; $i++){
     kubectl get pod ("$($bcinstance)-$i") -n $k8sNamespace -o jsonpath="{.metadata.labels}" | ConvertFrom-Json | grep -v controller | grep -v app | grep -v arc-resource | grep -v -e '^$'
     }
 
-# Updates
+# Updates - Ben
 kubectl config use-context kubeadm-small
 
 # Our DC is up to date
@@ -170,8 +169,12 @@ sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT @@version"
 # Let's update
 az sql mi-arc upgrade -n mi-1 --use-k8s --k8s-namespace $k8sNamespace
 
-# Wait for upgraded Pod
-kubectl get pods mi-1-0 -n $k8sNamespace -w
+# Backup / Restore - Jes
+# az sql midb-arc restore --managed-instance mi-1 --name BackupDemo --dest-name RestoreDemo --k8s-namespace arc --time $PointInTime --use-k8s
+# kubectl get SqlManagedInstanceRestoreTask -n $k8sNamespace
+
+# Wait for upgraded Pod - Ben
+kubectl get pods mi-1-0 -n $k8sNamespace
 
 # Check the log
 kubectl logs mi-1-0 -n $k8sNamespace -c arc-sqlmi 
@@ -179,20 +182,7 @@ kubectl logs mi-1-0 -n $k8sNamespace -c arc-sqlmi
 # And our MI is updated
 sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT @@version"
 
-# Backup / Restore
-# We have a fancy Database with PIT data
-sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT TOP 5 * FROM BackupDemo.dbo.Timestamps order by ts desc"
-
-$PointInTime=(get-date).AddMinutes(-90).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.ffZ")
-
-az sql midb-arc restore --managed-instance mi-1 --name BackupDemo --dest-name RestoreDemo --k8s-namespace arc --time $PointInTime --use-k8s
-sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT TOP 5 * FROM BackupDemo.dbo.Timestamps order by ts desc"
-sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT TOP 5 * FROM RestoreDemo.dbo.Timestamps order by ts desc"
-
-kubectl get SqlManagedInstanceRestoreTask -n $k8sNamespace
-
-
-# Upload to Azure
+# Upload to Azure - Ben
 kubectl config use-context kubeadm-big
 
 # Connect to Azure Monitor:
