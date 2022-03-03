@@ -13,12 +13,12 @@ kubectl get nodes
 kubectl config use-context kubeadm-big
 kubectl get nodes
 
-# A bit time factor is image download - so we've pre-pulled them
-kubectl get nodes k8s-big-worker-1 -o jsonpath="{range .status.images[*]}{.names[1]}{'\n'}{end}" | grep arcdata 
+# A big time factor is image download - so we've pre-pulled them
+kubectl get nodes (kubectl get nodes -o jsonpath="{.items[1].metadata.name}" ) -o jsonpath="{range .status.images[*]}{.names[1]}{'\n'}{end}" | grep arcdata 
 
 # It's almost 40 GB (for current and previous version) - PER WORKER!
 $TotalSize = 0
-((kubectl get nodes k8s-big-worker-1  -o jsonpath="{range .status.images[*]}{.sizeBytes}{'\t'}{.names[1]}{'\n'}{end}" | grep arcdata).Split("`t") | grep -v mcr).Split("`n") | Foreach { $TotalSize += $_}
+((kubectl get nodes  (kubectl get nodes -o jsonpath="{.items[1].metadata.name}" )  -o jsonpath="{range .status.images[*]}{.sizeBytes}{'\t'}{.names[1]}{'\n'}{end}" | grep arcdata).Split("`t") | grep -v mcr).Split("`n") | Foreach { $TotalSize += $_}
 [Math]::Round(($TotalSize/1024/1024),2)
 
 
@@ -181,13 +181,13 @@ sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT @@version"
 
 # Backup / Restore
 # We have a fancy Database with PIT data
-sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT * FROM BackupDemo.dbo.Timestamps order by ts desc"
+sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT TOP 5 * FROM BackupDemo.dbo.Timestamps order by ts desc"
 
 $PointInTime=(get-date).AddMinutes(-90).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.ffZ")
 
 az sql midb-arc restore --managed-instance mi-1 --name BackupDemo --dest-name RestoreDemo --k8s-namespace arc --time $PointInTime --use-k8s
-sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT * FROM BackupDemo.dbo.Timestamps order by ts desc"
-sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT * FROM RestoreDemo.dbo.Timestamps order by ts desc"
+sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT TOP 5 * FROM BackupDemo.dbo.Timestamps order by ts desc"
+sqlcmd -S $SQLEndpoint -U $ENV:AZDATA_USERNAME -Q "SELECT TOP 5 * FROM RestoreDemo.dbo.Timestamps order by ts desc"
 
 kubectl get SqlManagedInstanceRestoreTask -n $k8sNamespace
 
